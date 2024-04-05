@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p5.js Boilerplate</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <script>
+      let cells = [];
+      let cellSize = 6;
+      let width = 256 * cellSize;
+      let height = 200 * cellSize;
+      let pd = 1;
+      let speedConfig = 60;
+      let paused = false;
+      let pausedButton;
+      let canvas;
+      let resetButton;
+      let buffer;
+
+      let colors = [];
+      const numColors = 4;
+      for (let i = 0; i < numColors; i++) {
+        colors.push([i*360 / numColors, 100, 40]);
+      }
+      colors.reverse();
+
+      function setup() {
+        buffer = createGraphics(width, height);
+        canvas = createCanvas(width, height);
+        stroke(255);
+        pixelDensity(pd);
+        colorMode(HSL);
+        speedConfig = createSlider(1, 60, 60);
+        speedConfig.position(canvas.position().x + 100, canvas.position().y + height + 10);
+        speedConfig.style('width', '80px');
+        pausedButton = createButton('Pause');
+        pausedButton.position(canvas.position().x + 340, canvas.position().y + height + 10);
+        resetButton = createButton('Reset');
+        resetButton.position(canvas.position().x + 400, canvas.position().y + height + 10);
+
+        pausedButton.mousePressed(() => {
+          paused = !paused;
+          pausedButton.html(paused ? 'Resume' : 'Pause');
+        });
+
+        const reset = function() {
+          cells = Array(width / cellSize).fill().map(() => Math.floor(Math.random() * numColors));
+        }
+
+        resetButton.mousePressed(reset);
+
+        // Initialize cells with random values
+        reset();
+      }
+
+      function updateGeneration(cur) {
+        let nextGen = Array(cur.length).fill(0);
+        for (let i = 1; i < cur.length - 1; i++) {
+          const left = cur[(i+cur.length-1)%cur.length];
+          const center = cur[i];
+          const right = cur[(i+1)%cur.length];
+
+          // Age 0-1 cells act like rule 30 and age
+          if (center === 1 || center === 0) {
+            if (left ^ (center | right)) {
+              nextGen[i] = center + 1;
+            } else {
+              nextGen[i] = 0;
+            }
+
+            continue;
+          }
+
+          // Age 2 cells act like rule 110 and age
+          if (center === 2 || center === 3) {
+            const l = left == 2 || left == 3;
+            const r = right == 2 || right == 3;
+            if (!(l || r)) {
+              nextGen[i] = 3;
+            } else {
+              nextGen[i] = 0;
+            }
+
+            continue;
+          }
+
+          // Age 4 cells die
+          if (center === 4) {
+            nextGen[i] = 0;
+            continue;
+          }
+        }
+
+        return nextGen;
+      }
+
+      function renderCell(cell, x) {
+        fill(colors[cell]);
+        stroke(colors[cell]);
+        rect(x * cellSize, height - cellSize, cellSize, cellSize);
+      }
+
+      function draw() {
+        // Scroll existing generations if they reach the bottom
+        frameRate(speedConfig.value());
+        if (paused) {
+          return;
+        }
+
+        buffer.copy(get(), 0, 0, width, height, 0, -cellSize, width, height);
+        image(buffer, 0, 0);
+
+        cells = updateGeneration(cells);
+
+        // Render cells
+        for (let i = 0; i < cells.length; i++) {
+          renderCell(cells[i], i);
+        }
+      }
+
+    </script>
+</body>
+</html>
