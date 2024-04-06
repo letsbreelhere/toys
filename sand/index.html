@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>p5.js Boilerplate</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #111;
+        }
+    </style>
+</head>
+<body>
+    <script>
+      let cellSize = 6;
+      let cellWidth = 256;
+      let cellHeight = 200;
+      let width = cellWidth * cellSize;
+      let height = cellHeight * cellSize;
+      let pd = 1;
+      let fps = 60;
+      let canvas;
+      let paused = false;
+      let pausedButton;
+      let resetButton;
+      let fpsSlider;
+      let sandCells = {};
+      let fireCells = {};
+
+      function setup() {
+        frameRate(fps);
+        canvas = createCanvas(width, height);
+        // Fill canvas with black
+        pixelDensity(1);
+        colorMode(HSL);
+        resetButton = createButton('Reset');
+        resetButton.position(canvas.position().x + 400, canvas.position().y + height + 10);
+
+        pausedButton = createButton('Pause');
+        pausedButton.position(canvas.position().x + 340, canvas.position().y + height + 10);
+        pausedButton.mousePressed(() => {
+          paused = !paused;
+          pausedButton.html(paused ? 'Resume' : 'Pause');
+        });
+
+        fpsSlider = createSlider(1, 120, fps, 1);
+        fpsSlider.position(canvas.position().x + 200, canvas.position().y + height + 10);
+        fpsSlider.input(() => {
+          fps = fpsSlider.value();
+          frameRate(fps);
+        });
+
+        const reset = function() {
+          sandCells = {};
+          fill(0);
+          stroke(0);
+          rect(0, 0, width, height);
+        }
+
+        resetButton.mousePressed(reset);
+
+        // Initialize cells with random values
+        reset();
+
+        for (let element of document.getElementsByClassName("p5Canvas")) {
+          element.addEventListener("contextmenu", (e) => e.preventDefault());
+        }
+      }
+
+      function draw() {
+        if (mouseIsPressed) {
+          let x = floor(mouseX / cellSize);
+          let y = floor(mouseY / cellSize);
+          for (let dx = -2; dx <= 2; dx++) {
+            for (let dy = -2; dy <= 2; dy++) {
+              if (mouseButton === LEFT) {
+                sandCells[[x + dx, y + dy]] = { color: random(30, 60) };
+              } else if (mouseButton === RIGHT) {
+                fireCells[[x + dx, y + dy]] = { color: random(0, 30) };
+              }
+            }
+          }
+        }
+
+        const fireArray = Object.keys(fireCells).map((key) => key.split(',').map(Number));
+        let fireDeleted = [];
+        let fireAdded = [];
+        for (let c of fireArray) {
+          let x = c[0];
+          let y = c[1];
+          if (y === 0) {
+            fireDeleted.push([x, y]);
+            continue;
+          }
+
+          if (x < 0 || x >= cellWidth || y < 0 || y >= cellHeight) {
+            fireDeleted.push([x, y]);
+            continue;
+          }
+
+          if (y > 0) {
+            let above = [x, y - 1];
+            if (sandCells[above]) {
+              delete sandCells[above];
+              fireDeleted.push([x, y]);
+              fireCells[above] = fireCells[[x, y]];
+              fireAdded.push(above);
+            } else {
+              let direction = random() < 0.5 ? -1 : 1;
+              let target = [x + direction, y - 1];
+              if (!fireCells[target]) {
+                fireCells[target] = fireCells[[x, y]];
+                fireDeleted.push([x, y]);
+                fireAdded.push(target);
+              }
+            }
+          }
+        }
+
+        const sandArray = Object.keys(sandCells).map((key) => key.split(',').map(Number));
+        let deleted = [];
+        let added = [];
+        for (let c of sandArray) {
+          let x = c[0];
+          let y = c[1];
+
+          if (x < 0 || x >= cellWidth) {
+            deleted.push([x, y]);
+            continue;
+          }
+
+          if (y < cellHeight - 1) {
+            let below = [x, y + 1];
+            if (sandCells[below]) {
+              let left = [x - 1, y + 1];
+              let right = [x + 1, y + 1];
+              if (!sandCells[left] && !sandCells[right]) {
+                let direction = random() < 0.5 ? -1 : 1;
+                let target = [x + direction, y + 1];
+                if (!sandCells[target]) {
+                  sandCells[target] = sandCells[[x, y]];
+                  deleted.push([x, y]);
+                  added.push(target);
+                }
+              } else if (!sandCells[left]) {
+                deleted.push([x, y]);
+                sandCells[left] = sandCells[[x, y]];
+                added.push(left);
+              } else if (!sandCells[right]) {
+                deleted.push([x, y]);
+                sandCells[right] = sandCells[[x, y]];
+                added.push(right);
+              }
+            } else {
+              deleted.push([x, y]);
+              added.push(below);
+              sandCells[below] = sandCells[[x, y]];
+            }
+          }
+        }
+
+        for (cell of fireDeleted) {
+          let x = cell[0];
+          let y = cell[1];
+          delete fireCells[cell];
+          fill(0);
+          rect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+
+        for (cell of fireAdded) {
+          if (!fireCells[cell]) {
+            continue;
+          }
+          let x = cell[0];
+          let y = cell[1];
+          fill(fireCells[[x, y]].color, 50, 50);
+          noStroke();
+          rect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+
+        for (cell of deleted) {
+          let x = cell[0];
+          let y = cell[1];
+          delete sandCells[cell];
+          fill(0);
+          rect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+
+        for (cell of added) {
+          let x = cell[0];
+          let y = cell[1];
+          fill(sandCells[[x, y]].color, 50, 50);
+          noStroke();
+          rect(x * cellSize, y * cellSize, cellSize, cellSize);
+        }
+      }
+
+    </script>
+</body>
+</html>
