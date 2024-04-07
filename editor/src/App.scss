@@ -1,0 +1,47 @@
+body {
+  background-color: #282c34;
+}
+
+button {
+  background-color: #282c34;
+  color: lighten(#282c34, 30%);
+  border: 1px solid lighten(#282c34, 30%);
+
+  &:hover {
+    background-color: lighten(#282c34, 10%);
+  }
+
+  &:active {
+    background-color: lighten(#282c34, 20%);
+  }
+
+  padding: 10px 20px;
+  margin: 10px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+header {
+  width: 100vw;
+  padding: 10px 20px;
+}
+
+.container {
+  width: 100vw;
+  height: 100vh;
+  color: white;
+
+  display: flex;
+  flex: 1 1 auto;
+
+  .editor, .sandbox {
+    width: 100%;
+    resize: both;
+  }
+
+  .resize-bar {
+    background-color: lighten(#282c34, 10%);
+    width: 15px;
+    cursor: col-resize;
+  }
+}
