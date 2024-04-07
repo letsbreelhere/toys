@@ -1,10 +1,13 @@
 import { useRef, useState, useEffect } from 'react'
 import './App.scss'
 import Editor from '@monaco-editor/react'
+import { debounce } from 'lodash'
 
 const App = () => {
   const [isDragging, setIsDragging] = useState(false)
-  const resizeBarRef = useRef()
+  const sandboxRef = useRef(null)
+  const editorRef = useRef(null)
+  const iframeRef = useRef(null)
   const [code, setCode] = useState('')
   const [savedCode, setSavedCode] = useState('')
   const [runError, setRunError] = useState('')
@@ -19,24 +22,34 @@ const App = () => {
     })
   })
 
+  const drag = debounce((e) => {
+    e.preventDefault()
+    if (isDragging) {
+      const newPercent = 100*(window.innerWidth - e.clientX)/window.innerWidth;
+      editorRef.current.style.width = `${100 - newPercent}%`
+      sandboxRef.current.style.width = `${newPercent}%`
+    }
+  }, 0)
+
+
   return (
-    <div className="App">
+    <div className="App"
+      onMouseUp={() => {
+        setIsDragging(false)
+        iframeRef.current.style.pointerEvents = 'auto'
+      }}
+      onMouseMove={(e) => { drag(e) }}
+    >
       <header>
         <button onClick={() => {
           setSavedCode(code)
           setRunError('')
         }}>Run</button>
       </header>
-      <div className="container"
-        onMouseUp={() => { setIsDragging(false) }}
-        onMouseMove={(e) => {
-          e.preventDefault()
-          if (isDragging) {
-            // console.log(e.clientX)
-          }
-        }}
-      >
-        <div className="editor" ref={resizeBarRef}>
+      <div className="container">
+        <div className="editor"
+          ref={editorRef}
+        >
           {runError && <div className="error">{runError}</div>}
           <Editor
             width="100%"
@@ -54,16 +67,13 @@ const App = () => {
           onMouseDown={(e) => {
             e.preventDefault()
             setIsDragging(true)
+            iframeRef.current.style.pointerEvents = 'none'
           }}
         >
         </div>
-        <div className="sandbox">
+        <div className="sandbox" ref={sandboxRef}>
           <iframe
-            onLoad={e => {
-              const iframeWin = e.target.contentWindow
-              console.warn('iframeWin', iframeWin)
-              iframeWin.require = window.require
-            }}
+            ref={iframeRef}
             id="sandbox"
             style={{
               display: "block",
