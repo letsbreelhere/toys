@@ -13,6 +13,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+#app {
+  margin: auto;
+  display: flex;
+  width: 100vw;
+}
+
 a {
   font-weight: 500;
   color: #646cff;
@@ -93,4 +99,15 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+button.tab-button.active {
+  border-color: #646cff;
+}
+
+.tabbed_container {
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  margin: auto;
 }
