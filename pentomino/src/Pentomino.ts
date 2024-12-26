@@ -65,7 +65,7 @@ export const BASE_POINTS: Record<PentominoShape, Point[]> = {
   'W': canonicalize([[0, 0], [1, 0], [1, 1], [2, 1], [2, 2]]),
   'X': canonicalize([[0, 0], [0, 1], [1, 0], [0, -1], [-1, 0]]),
   'Y': canonicalize([[0, 0], [0, 1], [0, 2], [0, 3], [1, 1]]),
-  'Z': canonicalize([[0, 0], [0, 1], [1, 1], [1, 2], [2, 2]]),
+  'Z': canonicalize([[0, 0], [0, 1], [1, 1], [2, 1], [2, 2]]),
 }
 
 
@@ -78,6 +78,8 @@ export const ALL_BASE_POINTS: Record<PentominoShape, Point[][]> = function() {
 
   return res
 }()
+
+export const ALL_SHAPES: PentominoShape[] = Object.keys(ALL_BASE_POINTS) as PentominoShape[]
 
 export function placements(point: Point, shape: PentominoShape): Point[][] {
   let res: Point[][] = []
@@ -99,8 +101,102 @@ export type PuzzleCell = {
 } | {
   type: 'blocked'
 } | {
-  type: 'pentomino'
+  type: 'seed'
   shape: PentominoShape
+  index: number
+} | {
+  type: 'filled'
+  shape: PentominoShape
+  index: number
 }
 
 export type Puzzle = PuzzleCell[][]
+
+function puzzleGroups(puzzle: Puzzle): Record<number, {points: Point[], shape: PentominoShape }> {
+  const groups: Record<number, {points: Point[], shape: PentominoShape }> = {}
+
+  puzzle.forEach((row, i) => {
+    row.forEach((cell, j) => {
+      if (cell.type === 'seed' || cell.type === 'filled') {
+        if (!groups[cell.index]) {
+          groups[cell.index] = { points: [], shape: cell.shape }
+        }
+
+        groups[cell.index].points.push([i, j])
+      }
+    })
+  })
+  
+  return groups
+}
+
+function validPlacements(puzzle: Puzzle, index: number, shape: PentominoShape): Point[][] {
+  const groups = puzzleGroups(puzzle)
+  const seed = groups[index].points.find(p => puzzle[p[0]][p[1]].type === 'seed')
+
+  if (!seed) {
+    throw new Error('No seed found')
+  }
+
+  return placements(seed, shape).filter(p => {
+    const inBounds = p.every(([x, y]) => x >= 0 && x < puzzle.length && y >= 0 && y < puzzle[0].length)
+
+    if (!inBounds) {
+      return false
+    }
+    return p.every(([x, y]) =>
+      puzzle[x][y].type === 'empty' || (
+        puzzle[x][y].type === 'seed' && puzzle[x][y].index === index
+      )
+    )
+  })
+}
+
+let depth: number = 0
+export function solvePlacement(
+  puzzle: Puzzle,
+  callback: (i: number) => void = () => {},
+  reset = true
+): Puzzle | null {
+  if (reset) {
+    depth = 0
+  }
+  callback(depth)
+  let finalResult: Puzzle | null = null
+  const groups = puzzleGroups(puzzle)
+  const unfilledIndices = Object.keys(groups).filter(i =>
+    groups[parseInt(i)].points.length < 5
+  )
+
+  if (unfilledIndices.length === 0) {
+    return puzzle
+  }
+
+  const index = parseInt(unfilledIndices[0])
+
+  const validPlacementsForIndex = validPlacements(puzzle, index, groups[index].shape)
+
+  if (validPlacementsForIndex.length === 0) {
+    console.log(`${depth} No valid placements for`, groups[index].shape, index)
+    return null
+  }
+
+  validPlacementsForIndex.forEach(p => {
+    const newPuzzle = puzzle.map(row => row.slice())
+    p.forEach(([x, y]) => {
+      if (newPuzzle[x][y].type === 'seed') {
+        return
+      }
+      newPuzzle[x][y] = { type: 'filled', shape: groups[index].shape, index }
+    })
+
+    const result = solvePlacement(newPuzzle, callback, false)
+    if (result) {
+      depth++
+      finalResult = result
+      return
+    }
+  })
+
+  return finalResult
+}

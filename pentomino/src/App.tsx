@@ -1,59 +1,62 @@
 import { useReducer } from 'react'
 import classNames from 'classnames'
 import './App.scss'
-import { PuzzleCell, PentominoShape, ALL_BASE_POINTS, placements } from './Pentomino'
+import { PuzzleCell, PentominoShape, ALL_SHAPES } from './Pentomino'
 import reducer, {defaultState} from './reducer'
-
-const gridWidth = 10;
 
 type CellProps = {
   cell: PuzzleCell
   onClick: () => void
 }
 
-const SHAPE_COLORS: Record<PentominoShape, string> = {
-  'F': '#a6cee3',
-  'I': '#1f78b4',
-  'L': '#b2df8a',
-  'N': '#33a02c',
-  'P': '#fb9a99',
-  'T': '#e31a1c',
-  'U': '#fdbf6f',
-  'V': '#ff7f00',
-  'W': '#cab2d6',
-  'X': '#6a3d9a',
-  'Y': '#ffff99',
-  'Z': '#b15928',
-}
+const SHAPE_COLORS: Record<PentominoShape, [number, number, number]> =
+  ALL_SHAPES.reduce((acc, shape, i) => {
+    acc[shape as PentominoShape] = [0, 25, 50]
+    return acc
+  }, {} as Record<PentominoShape, [number, number, number]>)
 
 const Cell = ({ cell, onClick }: CellProps) => {
+  let backgroundColor
+
+  if (cell.type === 'seed' || cell.type === 'filled') {
+    const c = SHAPE_COLORS[cell.shape]
+    backgroundColor = `hsl(${c[0] + cell.index * 12}, ${(c[1] + cell.index * 20)%50+10}%, ${c[2]}%)`
+  }
+
   return (
     <div
       className={classNames('cell', cell.type)}
       style={{
-        backgroundColor: cell.type === 'pentomino' ? SHAPE_COLORS[cell.shape] : undefined
+        backgroundColor
       }}
       onClick={onClick}
     >
-      {cell.type === 'pentomino' && <div className="pentomino-label">{cell.shape}</div>}
+      {cell.type === 'seed' && <div className="pentomino-label">{cell.shape}<br/>{cell.index}</div>}
     </div>
   )
 }
 
 function App() {
-  const initialGrid: PuzzleCell[][] = Array.from({ length: gridWidth }, () => Array.from({ length: gridWidth }, () => ({ type: 'empty' })))
   const [state, dispatch] = useReducer(reducer, defaultState)
 
   return (
     <div className="App">
       <div className="sidebar">
         <button
-          className={classNames({ selected: state.selectedShape === 'clear' })}
+          style={{ backgroundColor: '#f00' }}
           onClick={() => {
-            dispatch({ type: 'selectShape', shape: 'clear' })
+            dispatch({ type: 'solve' })
           }}
         >
-          Clear
+          Sol
+        </button>
+        <button
+          style={{ backgroundColor: '#888' }}
+          onClick={() => {
+            dispatch({ type: 'clear' })
+          }}
+        >
+          Clr
         </button>
         <button
           className={classNames({ selected: state.selectedShape === 'blocked' })}
@@ -61,15 +64,18 @@ function App() {
             dispatch({ type: 'selectShape', shape: 'blocked' })
           }}
         >
-          Block
+          Blk
         </button>
-        {Object.keys(ALL_BASE_POINTS).map(shape => (
+        {ALL_SHAPES.map(shape => (
           <button
             key={shape}
-            style={{ backgroundColor: SHAPE_COLORS[shape as PentominoShape] }}
             className={classNames({ selected: state.selectedShape === shape })}
             onClick={() => {
-              dispatch({ type: 'selectShape', shape: state.selectedShape === shape ? null : shape as PentominoShape })
+              if (state.selectedShape === shape) {
+                dispatch({ type: 'selectShape', shape: 'blocked' })
+              } else {
+                dispatch({ type: 'selectShape', shape: shape as PentominoShape })
+              }
             }}
           >
             {shape}
@@ -85,7 +91,10 @@ function App() {
                   key={j}
                   cell={cell}
                   onClick={() => {
-                    if (state.selectedShape === 'clear') {
+                    const shouldEmpty =
+                      (cell.type === 'seed' && cell.shape === state.selectedShape) ||
+                      (cell.type === 'blocked' && state.selectedShape === 'blocked')
+                    if (shouldEmpty) {
                       dispatch({
                         type: 'setPoint',
                         point: [i, j],
@@ -103,7 +112,7 @@ function App() {
                       dispatch({
                         type: 'setPoint',
                         point: [i, j],
-                        cell: cell.type === 'empty' ? { type: 'pentomino', shape: state.selectedShape } : { type: 'empty' }
+                        cell: { type: 'seed', shape: state.selectedShape, index: state.index }
                       })
                     }
                   }}
