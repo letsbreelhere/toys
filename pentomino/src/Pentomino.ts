@@ -59,7 +59,7 @@ export const BASE_POINTS: Record<PentominoShape, Point[]> = {
   'L': canonicalize([[0, 0], [0, 1], [0, 2], [0, 3], [1, 3]]),
   'N': canonicalize([[0, 0], [0, 1], [0, 2], [1, 2], [1, 3]]),
   'P': canonicalize([[0, 0], [0, 1], [0, 2], [1, 0], [1, 1]]),
-  'T': canonicalize([[0, 0], [0, 1], [0, 2], [1, 1], [1, 2]]),
+  'T': canonicalize([[0, 0], [0, 1], [0, 2], [-1, 2], [1, 2]]),
   'U': canonicalize([[0, 0], [0, 1], [0, 2], [1, 0], [1, 2]]),
   'V': canonicalize([[0, 0], [1, 0], [2, 0], [0, 1], [0, 2]]),
   'W': canonicalize([[0, 0], [1, 0], [1, 1], [2, 1], [2, 2]]),

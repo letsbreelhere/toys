@@ -36,10 +36,10 @@ const reducer = (
     case 'setPoint':
       newGrid = state.grid.map(row => row.slice())
 
-      // Remove old filled cells
-      newGrid = newGrid.map(row => {
-        return row.map(cell => {
-          if (cell.type === 'filled') {
+      // Remove old filled cells, plus the new one
+      newGrid = newGrid.map((row, i) => {
+        return row.map((cell, j) => {
+          if (cell.type === 'filled' || action.point[0] === i && action.point[1] === j) {
             return { type: 'empty' }
           } else {
             return cell
@@ -48,11 +48,21 @@ const reducer = (
       })
 
       newGrid[action.point[0]][action.point[1]] = action.cell
-      let newIndex = state.index
-      if (action.cell.type === 'seed') {
-        newIndex++
+      // Least unused index
+      let index = 0
+      const seenIndices = new Set<number>()
+      newGrid.forEach(row => {
+        row.forEach(cell => {
+          if (cell.type === 'seed' || cell.type === 'filled') {
+            seenIndices.add(cell.index)
+          }
+        })
+      })
+      while (seenIndices.has(index)) {
+        index++
       }
-      return { ...state, grid: newGrid, index: newIndex }
+      
+      return { ...state, grid: newGrid, index }
     case 'selectShape':
       return { ...state, selectedShape: action.shape }
     case 'solve':

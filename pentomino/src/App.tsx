@@ -31,7 +31,7 @@ const Cell = ({ cell, onClick }: CellProps) => {
       }}
       onClick={onClick}
     >
-      {cell.type === 'seed' && <div className="pentomino-label">{cell.shape}<br/>{cell.index}</div>}
+      {cell.type === 'seed' && <div className="pentomino-label">{cell.shape}<sub>{cell.index}</sub></div>}
     </div>
   )
 }
