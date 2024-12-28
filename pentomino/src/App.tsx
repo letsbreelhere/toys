@@ -10,7 +10,7 @@ type CellProps = {
 }
 
 const SHAPE_COLORS: Record<PentominoShape, [number, number, number]> =
-  ALL_SHAPES.reduce((acc, shape, i) => {
+  ALL_SHAPES.reduce((acc, shape) => {
     acc[shape as PentominoShape] = [0, 25, 50]
     return acc
   }, {} as Record<PentominoShape, [number, number, number]>)
@@ -43,12 +43,20 @@ function App() {
     <div className="App">
       <div className="sidebar">
         <button
-          style={{ backgroundColor: '#f00' }}
+          style={{ backgroundColor: 'hsl(0, 70%, 60%)' }}
           onClick={() => {
             dispatch({ type: 'solve' })
           }}
         >
           Sol
+        </button>
+        <button
+          style={{ backgroundColor: 'hsl(120, 70%, 60%)' }}
+          onClick={() => {
+            dispatch({ type: 'generate' })
+          }}
+        >
+          Gen
         </button>
         <button
           style={{ backgroundColor: '#888' }}

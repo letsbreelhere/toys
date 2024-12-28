@@ -1,4 +1,4 @@
-import { Point, PentominoShape, Puzzle, PuzzleCell, solvePlacement } from './Pentomino'
+import { Point, PentominoShape, Puzzle, PuzzleCell, solvePlacement, fillRandom } from './Pentomino'
 
 export type Action = {
   type: 'setPoint'
@@ -11,6 +11,8 @@ export type Action = {
   type: 'solve'
 } | {
   type: 'clear'
+} | {
+  type: 'generate'
 }
 
 export type GameState = {
@@ -74,6 +76,16 @@ const reducer = (
       return { ...state, grid: solution }
     case 'clear':
       return { ...state, grid: defaultState.grid, index: 0 }
+    case 'generate':
+      let grid: Puzzle | null = state.grid.map(row => row.slice())
+      grid = fillRandom(grid)
+
+      if (!grid) {
+        console.log('No solution found')
+        return state
+      }
+      
+      return { ...state, grid }
   }
 }
 
