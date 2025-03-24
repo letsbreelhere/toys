@@ -47,8 +47,9 @@ def draw_tromp(expr, origin = (0, 0), lambda_heights = {}):
     case { "type": "lambda", "var": var, "expr": expr }:
       lambda_heights[var] = origin[1]
       (bbox, lines) = draw_tromp(expr, (origin[0], origin[1] + DIAGRAM_GAP), lambda_heights)
+      # Draw line over the lambda abstraction
       lines.append((origin[0], origin[1], origin[0] + bbox.width, origin[1]))
-      return (BBox(origin[0], origin[1], bbox.width, bbox.height), lines)
+      return (bbox, lines)
 
     case { "type": "app", "expr1": expr1, "expr2": expr2 }:
       (bbox1, lines1) = draw_tromp(expr1, origin, lambda_heights)
@@ -87,7 +88,7 @@ if __name__ == "__main__":
 
   omega = lam("x", app(var("x"), var("x")))
 
-  test_expr = lam("x", lam("y", lam("z", app(var("x"), var("z")))))
+  test_expr = app(omega, omega)
   # Get diagram lines and size
   (bbox, lines) = draw_tromp(test_expr)
 
