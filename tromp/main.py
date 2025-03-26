@@ -112,9 +112,58 @@ def substitute(expr, var, inner):
     case { "type": "lambda", "var": v, "expr": body }:
       if v == var:
         return expr
+      # If the bound variable v appears free in inner, we need to rename it
+      if v in get_free_vars(inner):
+        new_var = v + "'"
+        new_body = substitute(body, v, var(new_var))
+        return lam(new_var, substitute(new_body, var, inner))
       return lam(v, substitute(body, var, inner))
     case { "type": "app", "expr1": expr1, "expr2": expr2 }:
       return app(substitute(expr1, var, inner), substitute(expr2, var, inner))
+    case _:
+      raise Exception(f"Unknown expression type: {expr}")
+
+def rename_bound_var(expr, old_var, new_var, seen = False):
+  match expr:
+    case { "type": "var", "name": name }:
+      return var(new_var if name == old_var else name)
+    case { "type": "lambda", "var": v, "expr": body }:
+      if v == old_var:
+        if seen:
+          return expr
+        else:
+          return lam(new_var, rename_bound_var(body, old_var, new_var, True))
+      return lam(v, rename_bound_var(body, old_var, new_var, seen))
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      return app(rename_bound_var(expr1, old_var, new_var, seen), rename_bound_var(expr2, old_var, new_var, seen))
+    case _:
+      return expr
+
+def make_all_lambda_vars_unique(expr):
+  fresh_vars = {}
+  def make_unique(expr):
+    nonlocal fresh_vars
+    match expr:
+      case { "type": "lambda", "var": v, "expr": body }:
+        if v not in fresh_vars:
+          fresh_vars[v] = 0
+          return lam(v, make_unique(body))
+        fresh_vars[v] += 1
+        return make_unique(rename_bound_var(expr, v, v + str(fresh_vars[v])))
+      case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+        return app(make_unique(expr1), make_unique(expr2))
+      case _:
+        return expr
+  return make_unique(expr)
+
+def get_free_vars(expr):
+  match expr:
+    case { "type": "var", "name": name }:
+      return {name}
+    case { "type": "lambda", "var": v, "expr": body }:
+      return get_free_vars(body) - {v}
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      return get_free_vars(expr1) | get_free_vars(expr2)
     case _:
       raise Exception(f"Unknown expression type: {expr}")
 
@@ -126,14 +175,50 @@ def beta_reduce_step(expr):
         body = expr1["expr"]
         return substitute(body, var, expr2)
       return app(beta_reduce_step(expr1), beta_reduce_step(expr2))
+    case { "type": "lambda", "var": v, "expr": body }:
+      return lam(v, beta_reduce_step(body))
     case _:
       return expr
 
-def beta_reduce(expr):
-  while True:
-    reduced = beta_reduce_step(expr)
-    if reduced == expr:
+def rename_var(expr, old_var, new_var):
+  match expr:
+    case { "type": "var", "name": name }:
+      if name == old_var:
+        return var(new_var)
       return expr
+    case { "type": "lambda", "var": v, "expr": body }:
+      if v == old_var:
+        return expr # Skip renaming bound variables
+      return lam(v, rename_var(body, old_var, new_var))
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      return app(rename_var(expr1, old_var, new_var), rename_var(expr2, old_var, new_var))
+    case _:
+      raise Exception(f"Unknown expression type: {expr}")
+
+def alpha_equivalent(expr1, expr2):
+  match (expr1, expr2):
+    case ({ "type": "var", "name": name1 }, { "type": "var", "name": name2 }):
+      return name1 == name2
+    case ({ "type": "lambda", "var": v1, "expr": body1 }, { "type": "lambda", "var": v2, "expr": body2 }):
+      # For lambda expressions, we rename both bound variables to a fresh variable
+      # and compare the bodies
+      fresh_var = "fresh_" + str(len(get_free_vars(body1) | get_free_vars(body2)))
+      new_body1 = substitute(body1, v1, var(fresh_var))
+      new_body2 = substitute(body2, v2, var(fresh_var))
+      return alpha_equivalent(new_body1, new_body2)
+    case ({ "type": "app", "expr1": expr1_1, "expr2": expr1_2 }, { "type": "app", "expr1": expr2_1, "expr2": expr2_2 }):
+      return alpha_equivalent(expr1_1, expr2_1) and alpha_equivalent(expr1_2, expr2_2)
+    case _:
+      return False
+
+def beta_reduce(expr):
+  loc_expr = make_all_lambda_vars_unique(expr)
+  while True:
+    yield loc_expr
+    reduced = beta_reduce_step(loc_expr)
+    if alpha_equivalent(reduced, loc_expr):
+      return loc_expr
+    loc_expr = reduced
 
 def nth_iter(n):
   def subiter(n):
@@ -142,6 +227,30 @@ def nth_iter(n):
     return app(var("f"), subiter(n - 1))
   return lamn(["f", "x"], subiter(n))
 
+def pretty_print(expr):
+  match expr:
+    case { "type": "var", "name": name }:
+      return name
+    case { "type": "lambda", "var": v, "expr": body }:
+      return f"λ{v}.{pretty_print(body)}"
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      # Get the string representations
+      left = pretty_print(expr1)
+      right = pretty_print(expr2)
+
+      # Add parentheses when needed
+      if expr1["type"] == "lambda":
+        left = f"({left})"  # Lambda in function position needs parentheses
+
+      # Only add parentheses for right side if it's an application
+      # (Lambda already extends to the right, vars don't need parens)
+      if expr2["type"] == "app":
+        right = f"({right})"
+
+      return f"{left} {right}"
+    case _:
+      raise Exception(f"Unknown expression type: {expr}")
+
 if __name__ == "__main__":
   s_com = lam("x", lam("y", lam("z", app(app(var("x"), var("z")), app(var("y"), var("z"))))))
   k_com = lam("x", lam("y", var("x")))
@@ -149,6 +258,8 @@ if __name__ == "__main__":
   i_com = lam("x", var("x"))
   omega = lam("x", app(var("x"), var("x")))
   y_com = lam("f", app(omega, lam("x", app(var("f"), app(var("x"), var("x"))))))
+
+  succ = lam("n", lam("f", lam("x", app(var("f"), appn(var("n"), var("f"), var("x"))))))
 
   #  λn.λf.λx.n(λg.λh.h(g f))(λu.x)(λu.u)
   pred = lamn(["n", "f", "x"],
@@ -160,29 +271,65 @@ if __name__ == "__main__":
               )
   )
 
-  test_expr = pred
+  test_expr = y_com
 
   pygame.init()
-  width = 640
-  height = 480
+  width = 1920
+  height = 1080
   screen = pygame.display.set_mode((width, height))
   pygame.display.set_caption("Tromp diagrams")
   running = True
   font = pygame.font.Font(None, 24)
 
-  canvas = pygame.Surface((width - MARGIN*2, height - MARGIN*2))
-  canvas.fill((255, 255, 255))
-  blit_tromp(test_expr, canvas)
+  def draw_expr(expr):
+    canvas = pygame.Surface((width - MARGIN*2, height - MARGIN*2))
+    canvas.fill((255, 255, 255))
+    blit_tromp(expr, canvas)
+    return canvas
 
-  line_index = 0
   screen.fill((255, 255, 255))
+  reduction_generator = beta_reduce(test_expr)
+  current_expr = next(reduction_generator)
+  last_update_time = pygame.time.get_ticks()
+  update_interval = 100
+  is_final_expr = False
+
   while running:
     for event in pygame.event.get():
       if event.type == pygame.QUIT:
         running = False
 
-    mouse_pos = pygame.mouse.get_pos()
-    screen.blit(canvas, (0, 0))
+    current_time = pygame.time.get_ticks()
+    if current_time - last_update_time >= update_interval:
+      try:
+        next_expr = next(reduction_generator)
+        current_expr = next_expr
+        is_final_expr = False
+        last_update_time = current_time
+      except StopIteration:
+        # If we've reached the end of reductions, mark as final
+        is_final_expr = True
+        # Don't restart immediately - keep showing the final version in green
+
+    screen.fill((255, 255, 255))
+
+    # Draw the expression with green strokes if it's the final one
+    if is_final_expr:
+      # We need a custom draw function for the final expression
+      canvas = pygame.Surface((width - MARGIN*2, height - MARGIN*2))
+      canvas.fill((255, 255, 255))
+
+      # Temporarily change LINE_THICKNESS for the final expression
+      original_thickness = LINE_THICKNESS
+      (bbox, lines) = draw_tromp(current_expr)
+
+      # Draw lines in green
+      for line in lines:
+        pygame.draw.line(canvas, (0, 128, 0), (line[0], line[1]), (line[2], line[3]), LINE_THICKNESS)
+
+      screen.blit(canvas, (0, 0))
+    else:
+      screen.blit(draw_expr(current_expr), (0, 0))
 
     pygame.display.flip()
 
