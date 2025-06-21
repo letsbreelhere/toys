@@ -39,7 +39,7 @@ def test_make_unique_multiple_same_vars():
     expr = app(lam("x", var("x")), lam("x", var("x")))
     result = make_all_lambda_vars_unique(expr)
 
-    # Each nested lambda should have a unique variable
+    # Each lambda should have a unique variable
     assert result == app(lam("x", var("x")), lam("x1", var("x1")))
 
 def test_make_unique_complex_expression():

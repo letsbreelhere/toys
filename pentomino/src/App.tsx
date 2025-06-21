@@ -91,7 +91,7 @@ function App() {
         ))}
       </div>
       <div className="grid-container">
-        <div className="grid">
+        <div className="grid" data-testid="grid">
           {state.grid.map((row: PuzzleCell[], i: number) => (
             <div key={i} className="row">
               {row.map((cell, j) => (

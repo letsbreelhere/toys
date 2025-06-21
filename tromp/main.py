@@ -139,47 +139,6 @@ def rename_bound_var(expr, old_var, new_var, seen = False):
     case _:
       return expr
 
-def make_all_lambda_vars_unique(expr):
-  fresh_vars = {}
-  def make_unique(expr):
-    nonlocal fresh_vars
-    match expr:
-      case { "type": "lambda", "var": v, "expr": body }:
-        if v not in fresh_vars:
-          fresh_vars[v] = 0
-          return lam(v, make_unique(body))
-        fresh_vars[v] += 1
-        return make_unique(rename_bound_var(expr, v, v + str(fresh_vars[v])))
-      case { "type": "app", "expr1": expr1, "expr2": expr2 }:
-        return app(make_unique(expr1), make_unique(expr2))
-      case _:
-        return expr
-  return make_unique(expr)
-
-def get_free_vars(expr):
-  match expr:
-    case { "type": "var", "name": name }:
-      return {name}
-    case { "type": "lambda", "var": v, "expr": body }:
-      return get_free_vars(body) - {v}
-    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
-      return get_free_vars(expr1) | get_free_vars(expr2)
-    case _:
-      raise Exception(f"Unknown expression type: {expr}")
-
-def beta_reduce_step(expr):
-  match expr:
-    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
-      if expr1["type"] == "lambda":
-        var = expr1["var"]
-        body = expr1["expr"]
-        return substitute(body, var, expr2)
-      return app(beta_reduce_step(expr1), beta_reduce_step(expr2))
-    case { "type": "lambda", "var": v, "expr": body }:
-      return lam(v, beta_reduce_step(body))
-    case _:
-      return expr
-
 def rename_var(expr, old_var, new_var):
   match expr:
     case { "type": "var", "name": name }:
@@ -211,14 +170,104 @@ def alpha_equivalent(expr1, expr2):
     case _:
       return False
 
+def make_all_lambda_vars_unique(expr):
+  fresh_vars = {}
+  def make_unique(expr):
+    nonlocal fresh_vars
+    match expr:
+      case { "type": "lambda", "var": v, "expr": body }:
+        if v not in fresh_vars:
+          fresh_vars[v] = 0
+          return lam(v, make_unique(body))
+        fresh_vars[v] += 1
+        new_var = v + str(fresh_vars[v])
+        # Use rename_bound_var instead of rename_var to avoid infinite recursion
+        return lam(new_var, make_unique(rename_bound_var(body, v, new_var, False)))
+      case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+        return app(make_unique(expr1), make_unique(expr2))
+      case _:
+        return expr
+  return make_unique(expr)
+
+def get_free_vars(expr):
+  match expr:
+    case { "type": "var", "name": name }:
+      return {name}
+    case { "type": "lambda", "var": v, "expr": body }:
+      return get_free_vars(body) - {v}
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      return get_free_vars(expr1) | get_free_vars(expr2)
+    case _:
+      raise Exception(f"Unknown expression type: {expr}")
+
+def beta_reduce_step(expr):
+  match expr:
+    case { "type": "app", "expr1": { "type": "lambda", "var": var, "expr": body }, "expr2": expr2 }:
+      # This is a redex - we can reduce it
+      return substitute(body, var, expr2)
+
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      # Try reducing the left side first (normal order reduction)
+      reduced_expr1 = beta_reduce_step(expr1)
+      if not alpha_equivalent(reduced_expr1, expr1):
+        return app(reduced_expr1, expr2)
+
+      # If left side is in normal form, try reducing the right side
+      reduced_expr2 = beta_reduce_step(expr2)
+      if not alpha_equivalent(reduced_expr2, expr2):
+        return app(expr1, reduced_expr2)
+
+      # If we get here, both sides are in normal form
+      return expr
+
+    case { "type": "lambda", "var": v, "expr": body }:
+      return expr
+
+    case { "type": "var" }:
+      # Variables are already in normal form
+      return expr
+
+    case _:
+      raise Exception(f"Unknown expression type: {expr}")
+
+def is_redex(expr):
+  """Check if an expression contains any redexes (sub-expressions that can be reduced)"""
+  match expr:
+    case { "type": "var" }:
+      return False
+    case { "type": "lambda", "expr": body }:
+      return is_redex(body)
+    case { "type": "app", "expr1": { "type": "lambda" }, "expr2": _ }:
+      # Direct application of lambda to argument - this is a redex
+      return True
+    case { "type": "app", "expr1": expr1, "expr2": expr2 }:
+      # Check both components for redexes
+      return is_redex(expr1) or is_redex(expr2)
+    case _:
+      return False
+
 def beta_reduce(expr):
   loc_expr = make_all_lambda_vars_unique(expr)
+
+  # First yield the initial expression
+  yield loc_expr
+
   while True:
-    yield loc_expr
+    # Check if there are any redexes to reduce
+    if not is_redex(loc_expr):
+      # No redexes - we've reached normal form
+      return
+
+    # Perform one step of reduction
     reduced = beta_reduce_step(loc_expr)
+
+    # If no changes, we're done
     if alpha_equivalent(reduced, loc_expr):
-      return loc_expr
+      return
+
+    # Yield the reduced expression and continue
     loc_expr = reduced
+    yield loc_expr
 
 def nth_iter(n):
   def subiter(n):
@@ -259,8 +308,16 @@ if __name__ == "__main__":
   omega = lam("x", app(var("x"), var("x")))
   y_com = lam("f", app(omega, lam("x", app(var("f"), app(var("x"), var("x"))))))
 
-  succ = lam("n", lam("f", lam("x", app(var("f"), appn(var("n"), var("f"), var("x"))))))
-
+  succ = lamn(["n", "f", "x"],
+              appn(
+                var("f"),
+                appn(
+                  var("n"),
+                  var("f"),
+                  var("x")
+                )
+              )
+  )
   #  λn.λf.λx.n(λg.λh.h(g f))(λu.x)(λu.u)
   pred = lamn(["n", "f", "x"],
               appn(
