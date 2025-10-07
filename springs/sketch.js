@@ -2,6 +2,7 @@ let circles = [];
 let springs = [];
 
 const NUM_CIRCLES = 20;
+const SPRING_FORCE = 10;
 
 let width = null;
 let height = null;
@@ -19,7 +20,7 @@ function checkCollisions(c, i) {
     if (delta > 0) {
       // Shove circles apart by half of the required distance
       direction.normalize();
-      direction.mult(delta);
+      direction.mult(delta * SPRING_FORCE);
 
       c2.vel.add(direction);
       c2.force.add(direction);
@@ -28,6 +29,26 @@ function checkCollisions(c, i) {
       c.force.add(direction);
     }
   });
+}
+
+let grabbed = null;
+function mousePressed() {
+  let found = null;
+
+  circles.forEach((c) => {
+    if (
+      createVector(mouseX, mouseY).dist(createVector(c.x, c.y)) <
+      c.diameter / 2
+    ) {
+      found = c;
+      return;
+    }
+  });
+
+  grabbed = found;
+}
+function mouseReleased() {
+  grabbed = null;
 }
 
 function setup() {
@@ -39,7 +60,7 @@ function setup() {
   for (let i = 0; i < NUM_CIRCLES; i++) {
     const x = random(0, width);
     const y = random(0, height);
-    const diameter = random(40, 100);
+    const diameter = random(10, 100);
     circles.push({
       x,
       y,
@@ -66,9 +87,20 @@ function setup() {
 
 function draw() {
   t++;
+  textSize(24);
   background(20, 20, 20);
   stroke(200, 200, 200);
   noFill();
+
+  if (grabbed) {
+    const gpos = createVector(grabbed.x, grabbed.y);
+    const mpos = createVector(mouseX, mouseY);
+    gpos.mult(-1);
+    gpos.add(mpos);
+    gpos.mult(10);
+    grabbed.vel.mult(0.3);
+    grabbed.vel.add(gpos);
+  }
 
   circles.forEach((c) => {
     circle(c.x, c.y, c.diameter);
@@ -79,20 +111,29 @@ function draw() {
     const startCircle = circles[s.start];
     const endCircle = circles[s.end];
 
+    const distance = createVector(
+      startCircle.x - endCircle.x,
+      startCircle.y - endCircle.y
+    ).magSq();
+    const col = lerpColor(
+      color(100, 100, 100),
+      color(255, 0, 0),
+      (distance - 10) / 250 ** 2
+    );
+    stroke(col);
+
     line(startCircle.x, startCircle.y, endCircle.x, endCircle.y);
   });
 
   // Update positions and reset forces
   circles.forEach((c, i) => {
     checkCollisions(c, i);
-    c.x += c.vel.x * 0.04;
-    c.y += c.vel.y * 0.04;
+    c.x += c.vel.x / 60;
+    c.y += c.vel.y / 60;
 
-    c.force.mult(0.04);
+    c.force.mult(1 / 60);
     c.vel.add(c.force);
-    c.vel.mult(0.94);
-
-    c.force = createVector(0, 0);
+    c.vel.mult(0.9);
   });
 
   // Update forces
@@ -103,6 +144,7 @@ function draw() {
       endCircle.x - startCircle.x,
       endCircle.y - startCircle.y
     );
+    direction.mult(SPRING_FORCE);
 
     startCircle.force.add(direction);
     direction.mult(-1);
