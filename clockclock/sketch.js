@@ -14,6 +14,11 @@ class Clock {
     this.minuteTarget = 0;
   }
 
+  placeAtRatio(ratio) {
+    this.minute = lerp(this.minute, this.minuteTarget, ratio);
+    this.hour = lerp(this.hour, this.hourTarget, ratio);
+  }
+
   isSW() {
     return angleDiff(this.hour, clockDegreeToRadian(SW)) < 0.2
   }
@@ -251,33 +256,53 @@ class ClockDigit {
   constructor(opts) {
     this.clocks = [];
     this.tickover = opts.interval * 1000;
+    if (opts.ratio) {
+      this.tickover = opts.interval * 1000 * (1 + opts.ratio)
+    }
     this.last = 0;
     this.numeral = opts.numeral || 0;
     this.interval = opts.interval;
-    this.cycle = opts.cycle;
+    if (typeof opts.cycle === 'number') {
+      this.cycle = [];
+      for (let i = 0; i < opts.cycle; i++) {
+        this.cycle.push(i);
+      }
+    } else {
+      this.cycle = opts.cycle;
+    }
     for (let y = 0; y < 6; y++) {
       for (let x = 0; x < 4; x++) {
         const i = 4 * y + x;
         const clock = new Clock(opts.startx + x * RADIUS * 2, opts.starty + y * RADIUS * 2);
-        const [m, h] = NUMERALS[this.numeral][i];
+        const [m, h] = NUMERALS[this.cycle[this.numeral]][i];
         clock.minute = clockDegreeToRadian(m);
         clock.hour = clockDegreeToRadian(h);
         this.clocks.push(clock);
       }
     }
-    this.setClockTargets(this.interval);
+
+    this.ratio = opts.ratio;
+    this.setClockTargets();
   }
 
-  setClockTargets(seconds) {
+  setClockTargets() {
+    const ratio = this.ratio;
+    if (ratio) {
+      this.ratio = null;
+    }
     for (let i = 0; i < 24; i++) {
       const clock = this.clocks[i];
-      const [m, h] = NUMERALS[this.numeral][i];
+      const [m, h] = NUMERALS[this.cycle[this.numeral]][i];
       clock.minuteTarget = clockDegreeToRadian(m);
       clock.hourTarget = clockDegreeToRadian(h);
-      clock.minuteRate = (clock.minuteTarget - clock.minute) / (2 * seconds * Math.PI);
-      if (clock.minuteRate < 0.001) clock.minuteRate += 1 / seconds;
-      clock.hourRate = (clock.hourTarget - clock.hour) / (2 * seconds * Math.PI);
-      if (clock.hourRate < 0.001) clock.hourRate += 1 / seconds;
+      clock.minuteRate = (clock.minuteTarget - clock.minute) / (2 * this.interval * Math.PI);
+      if (clock.minuteRate < 0.001) clock.minuteRate += 1 / this.interval;
+      clock.hourRate = (clock.hourTarget - clock.hour) / (2 * this.interval * Math.PI);
+      if (clock.hourRate < 0.001) clock.hourRate += 1 / this.interval;
+      if (ratio) {
+        clock.placeAtRatio(ratio)
+      }
+
       if (!clock.minuteRate) {
         throw new Error("minuteRate is nan")
       }
@@ -293,7 +318,7 @@ class ClockDigit {
     this.last = m;
     if (this.tickover >= 1000 * this.interval) {
       this.numeral += 1;
-      this.numeral %= this.cycle;
+      this.numeral %= this.cycle.length;
       this.setClockTargets(this.interval);
       this.tickover -= 1000 * this.interval;
     }
@@ -310,10 +335,13 @@ function setup() {
   let x = 100;
 
   const h = d.getHours();
-  console.warn(h);
-  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 36000, cycle: 3, numeral: Math.floor(h / 10) }));
+  let hstr = String(h % 12);
+  if (hstr.length == 1) {
+    hstr = `0${hstr}`;
+  }
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 43200, cycle: 2, numeral: Number(hstr[0]) }));
   x += 200;
-  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 3600, cycle: 10, numeral: Math.floor(h % 10) }));
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 3600, cycle: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2], numeral: Number(hstr[1]) }))
 
   x += 250;
 
@@ -325,7 +353,7 @@ function setup() {
   x += 250;
 
   const s = d.getSeconds();
-  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 10, cycle: 6, numeral: Math.floor(s / 10) }));
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 10, cycle: 6, numeral: Math.floor(s / 10), ratio: (s % 10) / 10 }));
   x += 200;
   DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 1, cycle: 10, numeral: s % 10 }));
 }
