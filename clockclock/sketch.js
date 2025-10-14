@@ -91,6 +91,12 @@ function check() {
 }
 
 const NUMERALS = {
+  // ┏━━┓
+  // ┃┏┓┃
+  // ┃┃┃┃
+  // ┃┃┃┃
+  // ┃┗┛┃
+  // ┗━━┛
   0: [
     [S, E], [W, E], [W, E], [W, S],
     [N, S], [S, E], [W, S], [N, S],
@@ -99,6 +105,13 @@ const NUMERALS = {
     [N, S], [E, N], [N, W], [N, S],
     [E, N], [E, W], [W, E], [W, N],
   ],
+
+  // ┏━┓
+  // ┗┓┃
+  //  ┃┃
+  //  ┃┃
+  // ┏┛┗┓
+  // ┗━━┛
   1: [
     [E, S], [E, W], [S, W], EMPTY,
     [E, N], [W, S], [S, N], EMPTY,
@@ -107,6 +120,13 @@ const NUMERALS = {
     [S, E], [N, W], [N, E], [S, W],
     [N, E], [W, E], [E, W], [N, W],
   ],
+
+  // ┏━━┓
+  // ┗━┓┃
+  // ┏━┛┃
+  // ┃┏━┛
+  // ┃┗━┓
+  // ┗━━┛
   2: [
     [S, E], [W, E], [W, E], [W, S],
     [N, E], [E, W], [W, S], [N, S],
@@ -115,6 +135,13 @@ const NUMERALS = {
     [N, S], [E, N], [E, W], [W, S],
     [E, N], [E, W], [W, E], [W, N]
   ],
+
+  // ┏━━┓
+  // ┗━┓┃
+  // ┏━┛┃
+  // ┗━┓┃
+  // ┏━┛┃
+  // ┗━━┛
   3: [
     [E, S], [E, W], [E, W], [S, W],
     [E, N], [W, E], [S, W], [S, N],
@@ -123,6 +150,7 @@ const NUMERALS = {
     [S, E], [W, E], [W, N], [S, N],
     [N, E], [W, E], [E, W], [N, W],
   ],
+
   // ┏┓┏┓
   // ┃┃┃┃
   // ┃┗┛┃
@@ -137,6 +165,13 @@ const NUMERALS = {
     [SW, SW], [SW, SW], [N, S], [N, S],
     [SW, SW], [SW, SW], [N, E], [W, N],
   ],
+
+  // ┏━━┓
+  // ┃┏━┛
+  // ┃┗━┓
+  // ┗━┓┃
+  // ┏━┛┃
+  // ┗━━┛
   5: [
     [E, S], [E, W], [E, W], [S, W],
     [S, N], [E, S], [E, W], [W, N],
@@ -145,6 +180,7 @@ const NUMERALS = {
     [S, E], [E, W], [W, N], [S, N],
     [E, N], [E, W], [E, W], [N, W],
   ],
+
   // ┏━━┓
   // ┃┏━┛
   // ┃┗━┓
@@ -159,6 +195,7 @@ const NUMERALS = {
     [N, S], [N, E], [N, W], [N, S],
     [N, E], [W, E], [W, E], [W, N]
   ],
+
   // ┏━━┓
   // ┃┏┓┃
   // ┗┛┃┃
@@ -173,6 +210,7 @@ const NUMERALS = {
     EMPTY, EMPTY, [S, N], [S, N],
     EMPTY, EMPTY, [E, N], [N, W]
   ],
+
   // ┏━━┓
   // ┃┏┓┃
   // ┃┗┛┃
@@ -187,6 +225,7 @@ const NUMERALS = {
     [N, S], [E, N], [N, W], [N, S],
     [SE, N], [E, W], [W, E], [SW, N],
   ],
+
   // ┏━━┓
   // ┃┏┓┃
   // ┃┗┛┃
@@ -208,39 +247,67 @@ function clockDegreeToRadian(clockDegree) {
   return (clockDegree - 90) * Math.PI / 180;
 }
 
-function setClockTargets(numeral, seconds) {
-  for (let i = 0; i < 24; i++) {
-    const clock = CLOCKS[i];
-    const [m, h] = NUMERALS[numeral][i];
-    clock.minuteTarget = clockDegreeToRadian(m);
-    clock.hourTarget = clockDegreeToRadian(h);
-    clock.minuteRate = (clock.minuteTarget - clock.minute) / (2 * seconds * Math.PI);
-    // if (clock.minuteRate < 0) clock.minuteRate = 1 / seconds + clock.minuteRate;
-    if (clock.minuteRate < 0.001) clock.minuteRate += 1 / seconds;
-    clock.hourRate = (clock.hourTarget - clock.hour) / (2 * seconds * Math.PI);
-    // if (clock.hourRate < 0) clock.hourRate = 1 / seconds + clock.hourRate;
-    if (clock.hourRate < 0.001) clock.hourRate += 1 / seconds;
+class ClockDigit {
+  constructor(startx, starty, interval) {
+    this.clocks = [];
+    this.tickover = 10000;
+    this.last = 0;
+    this.numeral = 8;
+    this.interval = interval;
+    for (let y = 0; y < 6; y++) {
+      for (let x = 0; x < 4; x++) {
+        const i = 4 * y + x;
+        const clock = new Clock(startx + x * RADIUS * 2, starty + y * RADIUS * 2);
+        const [m, h] = NUMERALS[this.numeral][i];
+        clock.minute = clockDegreeToRadian(m);
+        clock.hour = clockDegreeToRadian(h);
+        this.clocks.push(clock);
+      }
+    }
+    this.setClockTargets(interval);
+  }
+
+  setClockTargets(seconds) {
+    for (let i = 0; i < 24; i++) {
+      const clock = this.clocks[i];
+      const [m, h] = NUMERALS[this.numeral][i];
+      clock.minuteTarget = clockDegreeToRadian(m);
+      clock.hourTarget = clockDegreeToRadian(h);
+      clock.minuteRate = (clock.minuteTarget - clock.minute) / (2 * seconds * Math.PI);
+      if (clock.minuteRate < 0.001) clock.minuteRate += 1 / seconds;
+      clock.hourRate = (clock.hourTarget - clock.hour) / (2 * seconds * Math.PI);
+      if (clock.hourRate < 0.001) clock.hourRate += 1 / seconds;
+      if (!clock.minuteRate) {
+        throw new Error("minuteRate is nan")
+      }
+    }
+  }
+
+  draw(m) {
+    const flash = this.tickover < 200 * (this.interval / 10) || this.tickover > 9800 * (this.interval / 10)
+    this.clocks.forEach((c) => c.draw(flash));
+    this.clocks.forEach((c) => c.update(m - this.last));
+
+    this.tickover += (m - this.last);
+    this.last = m;
+    if (this.tickover >= 1000) {
+      if (this.tickover >= 1000 * this.interval) {
+        this.numeral += 1;
+        this.numeral %= 10;
+        this.setClockTargets(this.interval);
+        this.tickover = 0;
+      }
+    }
   }
 }
 
-let tickover = 10000;
-let last = 0;
-let numeral = 8;
+const DIGITS = []
 
 function setup() {
-  for (let y = 0; y < 6; y++) {
-    for (let x = 0; x < 4; x++) {
-      const i = 4 * y + x;
-      const clock = new Clock(100 + x * RADIUS * 2, 100 + y * RADIUS * 2);
-      const [m, h] = NUMERALS[numeral][i];
-      clock.minute = clockDegreeToRadian(m);
-      clock.hour = clockDegreeToRadian(h);
-      CLOCKS.push(clock);
-    }
-  }
-  setClockTargets(0, 10);
   frameRate(60);
   createCanvas(windowWidth - 50, windowHeight - 50);
+  const digit = new ClockDigit(100, 100, 1);
+  DIGITS.push(digit);
 }
 
 const INTERVAL = 1;
@@ -248,19 +315,5 @@ const INTERVAL = 1;
 function draw() {
   background(20, 20, 20);
   const m = millis();
-
-  const flash = tickover < 300 * (INTERVAL / 10) || tickover > 9700 * (INTERVAL / 10)
-  CLOCKS.forEach((c) => c.draw(flash));
-  CLOCKS.forEach((c) => c.update(m - last));
-
-  tickover += (m - last);
-  last = m;
-  if (tickover >= 1000) {
-    if (tickover >= 1000 * INTERVAL) {
-      numeral += 1;
-      numeral %= 10;
-      setClockTargets(numeral, INTERVAL);
-      tickover = 0;
-    }
-  }
+  DIGITS.forEach((d) => d.draw(m));
 }
