@@ -27,7 +27,7 @@ class Clock {
       if (this.isSW()) {
         stroke(50, 50, 50);
       } else {
-        stroke(0, 255, 0);
+        stroke(255, 255, 255);
       }
     } else {
       stroke(100, 100, 100);
@@ -248,23 +248,24 @@ function clockDegreeToRadian(clockDegree) {
 }
 
 class ClockDigit {
-  constructor(startx, starty, interval) {
+  constructor(opts) {
     this.clocks = [];
-    this.tickover = interval * 1000;
+    this.tickover = opts.interval * 1000;
     this.last = 0;
-    this.numeral = 0;
-    this.interval = interval;
+    this.numeral = opts.numeral || 0;
+    this.interval = opts.interval;
+    this.cycle = opts.cycle;
     for (let y = 0; y < 6; y++) {
       for (let x = 0; x < 4; x++) {
         const i = 4 * y + x;
-        const clock = new Clock(startx + x * RADIUS * 2, starty + y * RADIUS * 2);
+        const clock = new Clock(opts.startx + x * RADIUS * 2, opts.starty + y * RADIUS * 2);
         const [m, h] = NUMERALS[this.numeral][i];
         clock.minute = clockDegreeToRadian(m);
         clock.hour = clockDegreeToRadian(h);
         this.clocks.push(clock);
       }
     }
-    this.setClockTargets(interval);
+    this.setClockTargets(this.interval);
   }
 
   setClockTargets(seconds) {
@@ -292,7 +293,7 @@ class ClockDigit {
     this.last = m;
     if (this.tickover >= 1000 * this.interval) {
       this.numeral += 1;
-      this.numeral %= 10;
+      this.numeral %= this.cycle;
       this.setClockTargets(this.interval);
       this.tickover -= 1000 * this.interval;
     }
@@ -304,10 +305,29 @@ const DIGITS = []
 function setup() {
   frameRate(60);
   createCanvas(windowWidth - 50, windowHeight - 50);
-  DIGITS.push(new ClockDigit(100, 100, 600));
-  DIGITS.push(new ClockDigit(300, 100, 60));
-  DIGITS.push(new ClockDigit(600, 100, 10));
-  DIGITS.push(new ClockDigit(800, 100, 1));
+  const d = new Date();
+
+  let x = 100;
+
+  const h = d.getHours();
+  console.warn(h);
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 36000, cycle: 3, numeral: Math.floor(h / 10) }));
+  x += 200;
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 3600, cycle: 10, numeral: Math.floor(h % 10) }));
+
+  x += 250;
+
+  const m = d.getMinutes();
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 600, cycle: 10, numeral: Math.floor(m / 10) }));
+  x += 200;
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 60, cycle: 10, numeral: Math.floor(m % 10) }));
+
+  x += 250;
+
+  const s = d.getSeconds();
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 10, cycle: 6, numeral: Math.floor(s / 10) }));
+  x += 200;
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 1, cycle: 10, numeral: s % 10 }));
 }
 
 const INTERVAL = 1;
