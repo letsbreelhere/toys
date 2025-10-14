@@ -15,15 +15,15 @@ class Clock {
   }
 
   isSW() {
-    return angleDiff(this.hour, clockDegreeToRadian(SW)) < 0.1
+    return angleDiff(this.hour, clockDegreeToRadian(SW)) < 0.2
   }
 
-  draw(moment) {
+  draw(flash) {
     push();
     strokeWeight(2);
     translate(this.pos.x, this.pos.y);
 
-    if (moment) {
+    if (flash) {
       if (this.isSW()) {
         stroke(50, 50, 50);
       } else {
@@ -250,9 +250,9 @@ function clockDegreeToRadian(clockDegree) {
 class ClockDigit {
   constructor(startx, starty, interval) {
     this.clocks = [];
-    this.tickover = 10000;
+    this.tickover = interval * 1000;
     this.last = 0;
-    this.numeral = 8;
+    this.numeral = 0;
     this.interval = interval;
     for (let y = 0; y < 6; y++) {
       for (let x = 0; x < 4; x++) {
@@ -290,13 +290,11 @@ class ClockDigit {
 
     this.tickover += (m - this.last);
     this.last = m;
-    if (this.tickover >= 1000) {
-      if (this.tickover >= 1000 * this.interval) {
-        this.numeral += 1;
-        this.numeral %= 10;
-        this.setClockTargets(this.interval);
-        this.tickover = 0;
-      }
+    if (this.tickover >= 1000 * this.interval) {
+      this.numeral += 1;
+      this.numeral %= 10;
+      this.setClockTargets(this.interval);
+      this.tickover -= 1000 * this.interval;
     }
   }
 }
@@ -306,8 +304,10 @@ const DIGITS = []
 function setup() {
   frameRate(60);
   createCanvas(windowWidth - 50, windowHeight - 50);
-  const digit = new ClockDigit(100, 100, 1);
-  DIGITS.push(digit);
+  DIGITS.push(new ClockDigit(100, 100, 600));
+  DIGITS.push(new ClockDigit(300, 100, 60));
+  DIGITS.push(new ClockDigit(600, 100, 10));
+  DIGITS.push(new ClockDigit(800, 100, 1));
 }
 
 const INTERVAL = 1;
