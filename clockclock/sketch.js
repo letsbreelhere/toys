@@ -1,0 +1,266 @@
+const RADIUS = 25;
+
+function angleDiff(a, b) {
+  const dot = Math.cos(a) * Math.cos(b) + Math.sin(a) * Math.sin(b);
+  return Math.abs(Math.acos(dot));
+}
+
+class Clock {
+  constructor(cx, cy) {
+    this.pos = createVector(cx, cy);
+    this.minute = Math.PI / 2;
+    this.hour = 0;
+    this.hourTarget = 0;
+    this.minuteTarget = 0;
+  }
+
+  isSW() {
+    return angleDiff(this.hour, clockDegreeToRadian(SW)) < 0.1
+  }
+
+  draw(moment) {
+    push();
+    strokeWeight(2);
+    translate(this.pos.x, this.pos.y);
+
+    if (moment) {
+      if (this.isSW()) {
+        stroke(50, 50, 50);
+      } else {
+        stroke(0, 255, 0);
+      }
+    } else {
+      stroke(100, 100, 100);
+    }
+
+    push();
+    rotate(this.minute);
+    line(0, 0, RADIUS, 0);
+    pop();
+
+    push();
+    rotate(this.hour);
+    line(0, 0, RADIUS, 0);
+    pop();
+
+    stroke(50, 50, 50);
+    strokeWeight(2);
+
+    noFill();
+    circle(0, 0, RADIUS * 2);
+    pop();
+  }
+
+  update(ms) {
+    this.hour += (2 * Math.PI * this.hourRate * ms) / 1000;
+    while (this.hour > 2 * Math.PI) this.hour -= 2 * Math.PI;
+    this.minute += (2 * Math.PI * this.minuteRate * ms) / 1000;
+    while (this.minute > 2 * Math.PI) this.minute -= 2 * Math.PI;
+  }
+}
+
+let CLOCKS = [];
+
+const N = 0;
+const NE = 45;
+const E = 90;
+const SE = 135;
+const S = 180;
+const SW = 225;
+const W = 270;
+const NW = 315;
+
+const EMPTY = [SW, SW]
+
+function check() {
+  let total = 0;
+  for (let i = 0; i < 10; i++) {
+    const next = (i + 1) % 10;
+    for (let j = 0; j < 24; j++) {
+      const ary1 = NUMERALS[i][j];
+      const ary2 = NUMERALS[next][j];
+      ary1.forEach((x, ix) => {
+        if (x == ary2[ix]) {
+          total++;
+          console.warn("At", `(${j}, ${ix})`, "numerals", i, "and", next, "are both", x)
+        }
+      })
+    }
+  }
+  console.warn("Found", total, "total matches");
+}
+
+const NUMERALS = {
+  0: [
+    [S, E], [W, E], [W, E], [W, S],
+    [N, S], [S, E], [W, S], [N, S],
+    [N, S], [S, N], [S, N], [N, S],
+    [N, S], [S, N], [S, N], [N, S],
+    [N, S], [E, N], [N, W], [N, S],
+    [E, N], [E, W], [W, E], [W, N],
+  ],
+  1: [
+    [E, S], [E, W], [S, W], EMPTY,
+    [E, N], [W, S], [S, N], EMPTY,
+    EMPTY, [N, S], [N, S], EMPTY,
+    EMPTY, [N, S], [N, S], EMPTY,
+    [S, E], [N, W], [N, E], [S, W],
+    [N, E], [W, E], [E, W], [N, W],
+  ],
+  2: [
+    [S, E], [W, E], [W, E], [W, S],
+    [N, E], [E, W], [W, S], [N, S],
+    [E, S], [E, W], [W, N], [N, S],
+    [N, S], [S, E], [E, W], [N, W],
+    [N, S], [E, N], [E, W], [W, S],
+    [E, N], [E, W], [W, E], [W, N]
+  ],
+  3: [
+    [E, S], [E, W], [E, W], [S, W],
+    [E, N], [W, E], [S, W], [S, N],
+    [S, E], [W, E], [N, W], [S, N],
+    [E, N], [E, W], [W, S], [S, N],
+    [S, E], [W, E], [W, N], [S, N],
+    [N, E], [W, E], [E, W], [N, W],
+  ],
+  // ┏┓┏┓
+  // ┃┃┃┃
+  // ┃┗┛┃
+  // ┗━┓┃
+  //   ┃┃
+  //   ┗┛
+  4: [
+    [S, E], [W, S], [S, E], [W, S],
+    [N, S], [S, N], [N, S], [N, S],
+    [N, S], [E, N], [W, N], [N, S],
+    [N, E], [W, E], [S, W], [N, S],
+    [SW, SW], [SW, SW], [N, S], [N, S],
+    [SW, SW], [SW, SW], [N, E], [W, N],
+  ],
+  5: [
+    [E, S], [E, W], [E, W], [S, W],
+    [S, N], [E, S], [E, W], [W, N],
+    [S, N], [N, E], [E, W], [S, W],
+    [E, N], [E, W], [W, S], [S, N],
+    [S, E], [E, W], [W, N], [S, N],
+    [E, N], [E, W], [E, W], [N, W],
+  ],
+  // ┏━━┓
+  // ┃┏━┛
+  // ┃┗━┓
+  // ┃┏┓┃
+  // ┃┗┛┃
+  // ┗━━┛
+  6: [
+    [S, E], [W, E], [W, E], [W, S],
+    [N, S], [S, E], [W, E], [N, W],
+    [N, S], [E, N], [W, E], [W, S],
+    [N, S], [S, E], [S, W], [N, S],
+    [N, S], [N, E], [N, W], [N, S],
+    [N, E], [W, E], [W, E], [W, N]
+  ],
+  // ┏━━┓
+  // ┃┏┓┃
+  // ┗┛┃┃
+  //   ┃┃
+  //   ┃┃
+  //   ┗┛
+  7: [
+    [E, S], [E, W], [E, W], [S, W],
+    [S, N], [E, S], [S, W], [S, N],
+    [E, N], [N, W], [N, S], [S, N],
+    EMPTY, EMPTY, [N, S], [S, N],
+    EMPTY, EMPTY, [S, N], [S, N],
+    EMPTY, EMPTY, [E, N], [N, W]
+  ],
+  // ┏━━┓
+  // ┃┏┓┃
+  // ┃┗┛┃
+  // ┃┏┓┃
+  // ┃┗┛┃
+  // ┗━━┛
+  8: [
+    [S, NE], [W, E], [W, E], [NW, S],
+    [N, S], [S, E], [W, S], [N, S],
+    [N, S], [E, N], [W, N], [N, S],
+    [N, S], [S, E], [S, W], [N, S],
+    [N, S], [E, N], [N, W], [N, S],
+    [SE, N], [E, W], [W, E], [SW, N],
+  ],
+  // ┏━━┓
+  // ┃┏┓┃
+  // ┃┗┛┃
+  // ┗━┓┃
+  // ┏━┛┃
+  // ┗━━┛
+  9: [
+    [E, S], [E, W], [E, W], [S, W],
+    [S, N], [E, S], [S, W], [S, N],
+    [S, N], [N, E], [N, W], [S, N],
+    [E, N], [E, W], [W, S], [S, N],
+    [S, E], [W, E], [W, N], [S, N],
+    [N, E], [W, E], [E, W], [N, W],
+  ],
+};
+
+// Convert "clock degrees" (degrees _clockwise_, starting at (0,1)) to standard clockwise radians.
+function clockDegreeToRadian(clockDegree) {
+  return (clockDegree - 90) * Math.PI / 180;
+}
+
+function setClockTargets(numeral, seconds) {
+  for (let i = 0; i < 24; i++) {
+    const clock = CLOCKS[i];
+    const [m, h] = NUMERALS[numeral][i];
+    clock.minuteTarget = clockDegreeToRadian(m);
+    clock.hourTarget = clockDegreeToRadian(h);
+    clock.minuteRate = (clock.minuteTarget - clock.minute) / (2 * seconds * Math.PI);
+    // if (clock.minuteRate < 0) clock.minuteRate = 1 / seconds + clock.minuteRate;
+    if (clock.minuteRate < 0.001) clock.minuteRate += 1 / seconds;
+    clock.hourRate = (clock.hourTarget - clock.hour) / (2 * seconds * Math.PI);
+    // if (clock.hourRate < 0) clock.hourRate = 1 / seconds + clock.hourRate;
+    if (clock.hourRate < 0.001) clock.hourRate += 1 / seconds;
+  }
+}
+
+let tickover = 10000;
+let last = 0;
+let numeral = 8;
+
+function setup() {
+  for (let y = 0; y < 6; y++) {
+    for (let x = 0; x < 4; x++) {
+      const i = 4 * y + x;
+      const clock = new Clock(100 + x * RADIUS * 2, 100 + y * RADIUS * 2);
+      const [m, h] = NUMERALS[numeral][i];
+      clock.minute = clockDegreeToRadian(m);
+      clock.hour = clockDegreeToRadian(h);
+      CLOCKS.push(clock);
+    }
+  }
+  setClockTargets(0, 10);
+  frameRate(60);
+  createCanvas(windowWidth - 50, windowHeight - 50);
+}
+
+const INTERVAL = 1;
+
+function draw() {
+  background(20, 20, 20);
+  const m = millis();
+
+  const flash = tickover < 300 * (INTERVAL / 10) || tickover > 9700 * (INTERVAL / 10)
+  CLOCKS.forEach((c) => c.draw(flash));
+  CLOCKS.forEach((c) => c.update(m - last));
+
+  tickover += (m - last);
+  last = m;
+  if (tickover >= 1000) {
+    if (tickover >= 1000 * INTERVAL) {
+      numeral += 1;
+      numeral %= 10;
+      setClockTargets(numeral, INTERVAL);
+      tickover = 0;
+    }
+  }
+}
