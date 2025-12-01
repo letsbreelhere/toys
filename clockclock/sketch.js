@@ -14,11 +14,6 @@ class Clock {
     this.minuteTarget = 0;
   }
 
-  placeAtRatio(ratio) {
-    this.minute = lerp(this.minute, this.minuteTarget, ratio);
-    this.hour = lerp(this.hour, this.hourTarget, ratio);
-  }
-
   isSW() {
     return angleDiff(this.hour, clockDegreeToRadian(SW)) < 0.2
   }
@@ -39,21 +34,34 @@ class Clock {
     }
 
     push();
-    rotate(this.minute);
-    line(0, 0, RADIUS, 0);
+    const mpos = this.positionOnSquare(this.minute);
+    line(0, 0, mpos.x * RADIUS, mpos.y * RADIUS);
     pop();
 
     push();
-    rotate(this.hour);
-    line(0, 0, RADIUS, 0);
+    const hpos = this.positionOnSquare(this.hour);
+    line(0, 0, hpos.x * RADIUS, hpos.y * RADIUS);
     pop();
 
     stroke(50, 50, 50);
     strokeWeight(2);
 
     noFill();
-    circle(0, 0, RADIUS * 2);
+    square(-RADIUS, -RADIUS, RADIUS * 2);
     pop();
+  }
+
+  positionOnSquare(angle) {
+    const dx = Math.cos(angle);
+    const dy = Math.sin(angle);
+
+    // Normalize to the square by dividing by the maximum component
+    const scale = 1 / Math.max(Math.abs(dx), Math.abs(dy));
+
+    return {
+      x: dx * scale,
+      y: dy * scale
+    };
   }
 
   update(ms) {
@@ -256,10 +264,10 @@ class ClockDigit {
   constructor(opts) {
     this.clocks = [];
     this.tickover = opts.interval * 1000;
-    if (opts.ratio) {
-      this.tickover = opts.interval * 1000 * (1 + opts.ratio)
-    }
     this.last = 0;
+    if (opts.offset) {
+      this.last = opts.offset;
+    }
     this.numeral = opts.numeral || 0;
     this.interval = opts.interval;
     if (typeof opts.cycle === 'number') {
@@ -269,6 +277,10 @@ class ClockDigit {
       }
     } else {
       this.cycle = opts.cycle;
+    }
+    if (opts.offset) {
+      this.numeral++;
+      this.numeral %= this.cycle.length;
     }
     for (let y = 0; y < 6; y++) {
       for (let x = 0; x < 4; x++) {
@@ -281,15 +293,10 @@ class ClockDigit {
       }
     }
 
-    this.ratio = opts.ratio;
     this.setClockTargets();
   }
 
   setClockTargets() {
-    const ratio = this.ratio;
-    if (ratio) {
-      this.ratio = null;
-    }
     for (let i = 0; i < 24; i++) {
       const clock = this.clocks[i];
       const [m, h] = NUMERALS[this.cycle[this.numeral]][i];
@@ -299,11 +306,8 @@ class ClockDigit {
       if (clock.minuteRate < 0.001) clock.minuteRate += 1 / this.interval;
       clock.hourRate = (clock.hourTarget - clock.hour) / (2 * this.interval * Math.PI);
       if (clock.hourRate < 0.001) clock.hourRate += 1 / this.interval;
-      if (ratio) {
-        clock.placeAtRatio(ratio)
-      }
 
-      if (!clock.minuteRate) {
+      if (!clock.minuteRate && clock.minuteRate !== 0) {
         throw new Error("minuteRate is nan")
       }
     }
@@ -316,7 +320,7 @@ class ClockDigit {
 
     this.tickover += (m - this.last);
     this.last = m;
-    if (this.tickover >= 1000 * this.interval) {
+    while (this.tickover >= 1000 * this.interval) {
       this.numeral += 1;
       this.numeral %= this.cycle.length;
       this.setClockTargets(this.interval);
@@ -353,7 +357,7 @@ function setup() {
   x += 250;
 
   const s = d.getSeconds();
-  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 10, cycle: 6, numeral: Math.floor(s / 10), ratio: (s % 10) / 10 }));
+  DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 10, cycle: 6, numeral: Math.floor(s / 10), offset: (10000 - 1000 * (s % 10)) }));
   x += 200;
   DIGITS.push(new ClockDigit({ startx: x, starty: 100, interval: 1, cycle: 10, numeral: s % 10 }));
 }
